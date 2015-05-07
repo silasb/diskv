@@ -23,11 +23,12 @@ const (
 )
 
 var (
-	defaultTransform   = func(s string) []string { return []string{} }
-	errCanceled        = errors.New("canceled")
-	errEmptyKey        = errors.New("empty key")
-	errBadKey          = errors.New("bad key")
-	errImportDirectory = errors.New("can't import a directory")
+	defaultTransform    = func(s string) []string { return []string{} }
+	defaultKeyTransform = func(s string) string { return s }
+	errCanceled         = errors.New("canceled")
+	errEmptyKey         = errors.New("empty key")
+	errBadKey           = errors.New("bad key")
+	errImportDirectory  = errors.New("can't import a directory")
 )
 
 // TransformFunction transforms a key into a slice of strings, with each
@@ -38,11 +39,14 @@ var (
 // the final location of the data file will be <basedir>/ab/cde/f/abcdef
 type TransformFunction func(s string) []string
 
+type KeyTransformFunction func(s string) string
+
 // Options define a set of properties that dictate Diskv behavior.
 // All values are optional.
 type Options struct {
 	BasePath     string
 	Transform    TransformFunction
+	KeyTransform KeyTransformFunction
 	CacheSizeMax uint64 // bytes
 	PathPerm     os.FileMode
 	FilePerm     os.FileMode
@@ -71,6 +75,9 @@ func New(o Options) *Diskv {
 	}
 	if o.Transform == nil {
 		o.Transform = defaultTransform
+	}
+	if o.KeyTransform == nil {
+		o.KeyTransform = defaultKeyTransform
 	}
 	if o.PathPerm == 0 {
 		o.PathPerm = defaultPathPerm
@@ -475,7 +482,7 @@ func (d *Diskv) ensurePathWithLock(key string) error {
 
 // completeFilename returns the absolute path to the file for the given key.
 func (d *Diskv) completeFilename(key string) string {
-	return filepath.Join(d.pathFor(key), key)
+	return filepath.Join(d.pathFor(key), d.KeyTransform(key))
 }
 
 // cacheWithLock attempts to cache the given key-value pair in the store's
